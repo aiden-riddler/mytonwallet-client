@@ -10,7 +10,7 @@ import Link from '@mui/material/Link';
 const baseServerUrl = process.env.REACT_APP_SERVER_URL;
 
 const CompleteTaskComponent = () => {
-    const { giveawayId } = useParams();
+    const [giveawayId, setGiveawayId]  = useState(null);
     const { tonConnectUI } = useTonConnect();
     const [taskToken, setTaskToken] = useState('');
     const [loading, setLoading] = useState(false);
@@ -19,42 +19,39 @@ const CompleteTaskComponent = () => {
     const [res, setRes] = useState(null);
     const [giveaway, setGiveaway] = useState(null);
 
-    useEffect(() => {
-        const fetchGiveaway = async () => {
-            setLoading(true);
-            setError(null);
-            if (giveawayId) {
+    const fetchGiveaway = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        if (giveawayId) {
+            try {
+                const response = await axios.get(`${baseServerUrl}/giveaways/${giveawayId}`);
+                setGiveaway(response.data);
+
+                // get participant
                 try {
-                    const response = await axios.get(`${baseServerUrl}/giveaways/${giveawayId}`);
-                    setGiveaway(response.data);
-
-                    // get participant
-                    try {
-                        if (tonConnectUI && tonConnectUI.wallet){
-                            const address = tonConnectUI.account.address;
-                            const response2 = await axios.post(`${baseServerUrl}/participant/${giveawayId}`,{
-                                receiverAddress: address
-                            });
-                            if (response2.data.participant == 'awaitingPayment' || response2.data.participant == 'paid'){
-                                setRes(response2.data.participant);
-                            }
+                    if (tonConnectUI && tonConnectUI.wallet){
+                        const address = tonConnectUI.account.address;
+                        const response2 = await axios.post(`${baseServerUrl}/participant/${giveawayId}`,{
+                            receiverAddress: address
+                        });
+                        if (response2.data.participant == 'awaitingPayment' || response2.data.participant == 'paid'){
+                            setRes(response2.data.participant);
                         }
-                    } catch (err) {
-                        console.log("Error getting wallet");
                     }
-                    
                 } catch (err) {
-                    setError('Failed to fetch giveaway details');
-                    console.error(err);
-                } finally {
-                    setLoading(false);
+                    console.log("Error getting wallet");
                 }
+                
+            } catch (err) {
+                setError('Failed to fetch giveaway details');
+                console.error(err);
+            } finally {
+                setLoading(false);
             }
+        }
 
-        };
-
-        fetchGiveaway();
-    }, [giveawayId]);
+    };
 
     const handleCompleteTask = async () => {
         setLoading(true);
@@ -111,6 +108,20 @@ const CompleteTaskComponent = () => {
     }
     return (
         <div className="App">
+            <Box component="form" onSubmit={fetchGiveaway} sx={{ '& .MuiTextField-root': { m: 1, width: '25ch' } }}>
+                        <h2>Complete Giveaway Task</h2>
+
+                        <TextField
+                            required
+                            id="giveawayId"
+                            variant="standard"
+                            type="text" name="giveawayId" value={giveawayId} onChange={(e) => setGiveawayId(e.target.value)} label="Giveaway ID"
+                        />
+                        
+                        <Button style={{ marginTop: '15px'}} type="submit" variant="contained" disabled={loading}>
+                            GET DETAILS
+                        </Button>
+                    </Box>
             <Card variant="outlined">
                         {giveaway ? (
                             <CardContent>

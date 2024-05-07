@@ -14,11 +14,30 @@ import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import FingerprintIcon from '@mui/icons-material/Fingerprint';
 import { useTonConnect } from '../TonConnectContext';
+import { useTonWallet } from '@tonconnect/ui-react';
+import Paper from '@mui/material/Paper';
+import { styled } from '@mui/material/styles';
+import Stack from '@mui/material/Stack';
+import GiveAways from './Giveaways';
+import GiveawayDetails from './Giveaway';
+import CheckinComponent from './Checkin';
+import CompleteTaskComponent from './CompleteTask';
+
+const DemoPaper = styled(Paper)(({ theme }) => ({
+  width: '100%',
+  height: '100%',
+  padding: theme.spacing(2),
+  ...theme.typography.body2,
+  textAlign: 'center',
+}));
 
 const Layout = () => {
-  const { connectWallet, currentWallet, tonConnectUI, updateCurrentWallet, disconnectCurrentWallet } = useTonConnect();
+  const currentWallet = useTonWallet();
+  const { connectWallet, tonConnectUI, updateCurrentWallet, disconnectCurrentWallet } = useTonConnect();
   const [ anchorElNav, setAnchorElNav] = useState(null);
   const [ anchorElUser, setAnchorElUser] = useState(null);
+  const [ panel, setPanel] = useState(0);
+  const [ loading, setLoading ] = useState(false);
 
   const handleOpenNavMenu = (event) => {
     setAnchorElNav(event.currentTarget);
@@ -39,18 +58,12 @@ const Layout = () => {
   const handleConn = async () => {
     try {
       if (currentWallet){
-        console.log("Disconnecting wallet")
         await disconnectCurrentWallet(tonConnectUI.wallet);
       } else {
-        console.log("Connecting wallet", tonConnectUI.wallet)
-        updateCurrentWallet(tonConnectUI.wallet);
-        if (tonConnectUI.wallet == null) {
-          connectWallet();
-        }
+        connectWallet();
       }
-      
     } catch (error){
-      connectWallet();
+      console.log("An error occured. Try again later.");
     }
   }
 
@@ -139,7 +152,27 @@ const Layout = () => {
           </Toolbar>
         </Container>
       </AppBar>
-      <Outlet />
+      <div className='main-div'>
+        <div className='first-panel'>
+        <DemoPaper>
+                        <Stack spacing={2}>
+                            <Button variant='text' onClick={() => setPanel(0)} disabled={loading}>Create Giveaway</Button>
+                            <Button variant='text' onClick={() => setPanel(1)} disabled={loading}>View Giveaway</Button>
+                            <Button variant='text' onClick={() => setPanel(2)} disabled={loading}>Giveaway Checkin</Button>
+                            <Button variant='text' onClick={() => setPanel(3)} disabled={loading}>Complete Giveaway Task</Button>
+                        </Stack>
+                    </DemoPaper>
+          </div>
+          <div className='second-panel'>
+          <DemoPaper>
+            { panel === 0 && <GiveAways />}
+            { panel === 1 && <GiveawayDetails />}
+            { panel === 2 && <CheckinComponent />}
+            { panel === 3 && <CompleteTaskComponent />}
+
+                    </DemoPaper>
+          </div>
+      </div>
     </>
   );
 }

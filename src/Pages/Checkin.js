@@ -3,59 +3,59 @@ import { useTonConnect } from '../TonConnectContext';
 import axios from 'axios';
 import ReCAPTCHA from "react-google-recaptcha";
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Box from '@mui/material/Box';
 import { useParams } from 'react-router-dom';
 import CustomAlert from './AlertDia';
 import { Card, CardContent, Typography, Alert } from '@mui/material';
 import Link from '@mui/material/Link';
+import { useTonWallet, useTonAddress } from '@tonconnect/ui-react';
 
 const siteKey = process.env.REACT_APP_SITE_KEY;
 const baseServerUrl = process.env.REACT_APP_SERVER_URL;
 
 const CheckinComponent = () => {
-    const { giveawayId } = useParams();
+    const [giveawayId, setGiveawayId]  = useState(null);
     const [giveaway, setGiveaway] = useState(null);
-    const { tonConnectUI, currentWallet } = useTonConnect();
+    const currentWallet = useTonWallet();
+    const { tonConnectUI } = useTonConnect();
+    const userFriendlyAddress = useTonAddress();
+    const rawAddress = useTonAddress(false);
     const [recaptchaToken, setRecaptchaToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [res, setRes] = useState(null);
 
-    useEffect(() => {
-        const fetchGiveaway = async () => {
-            setLoading(true);
-            setError(null);
-            if (giveawayId) {
+    const fetchGiveaway = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        if (giveawayId) {
+            try {
+                const response = await axios.get(`${baseServerUrl}/giveaways/${giveawayId}`);
+                setGiveaway(response.data);
+
+                // get participant
                 try {
-                    const response = await axios.get(`${baseServerUrl}/giveaways/${giveawayId}`);
-                    setGiveaway(response.data);
-
-                    // get participant
-                    try {
-                        if (tonConnectUI && tonConnectUI.wallet){
-                            const address = tonConnectUI.account.address;
-                            const response2 = await axios.post(`${baseServerUrl}/participant/${giveawayId}`,{
-                                receiverAddress: address
-                            });
-                            console.log(response2.data.participant);
-                            setRes(response2.data.participant)
-                        }
-                    } catch (err) {
-                        console.log("Error getting wallet");
-                    }
-                    
+                    const response2 = await axios.post(`${baseServerUrl}/participant/${giveawayId}`,{
+                        receiverAddress: userFriendlyAddress
+                    });
+                    console.log("partcipants" , response2.data.participant);
+                    setRes(response2.data.participant)
                 } catch (err) {
-                    setError('Failed to fetch giveaway details');
-                    console.error(err);
-                } finally {
-                    setLoading(false);
+                    console.log("Error getting participant");
                 }
+                
+            } catch (err) {
+                setError('Failed to fetch giveaway details');
+                console.error(err);
+            } finally {
+                setLoading(false);
             }
+        }
 
-        };
-
-        fetchGiveaway();
-    }, [giveawayId]);
+    };
 
     // Load reCAPTCHA
     const onReCAPTCHAChecked = async (token) => {
@@ -63,19 +63,25 @@ const CheckinComponent = () => {
     };
 
     const handleCheckin = async () => {
+        console.log("Current Wallet", currentWallet);
+        // await tonConnectUI.openSingleWalletModal('mytonwallet');
         if (!tonConnectUI || !tonConnectUI.wallet) {
             setError('Please connect your wallet first');
             return;
         }
 
+        // console.log("Wallet", wallet.name);
+
         try {
-            const address = tonConnectUI.account.address;
-            const publicKey = tonConnectUI.account.publicKey;
+            const publicKey = currentWallet.account.publicKey;
+            console.log("Tonconnect ui", tonConnectUI);
             const signedProof = '';
+            if (currentWallet.connectItems?.tonProof && 'proof' in currentWallet.connectItems.tonProof)
+            signedProof = currentWallet.connectItems.tonProof.proof;
 
             if (recaptchaToken) {
                 const response2 = await axios.post(`${baseServerUrl}/participant/${giveawayId}`,{
-                    receiverAddress: address
+                    receiverAddress: userFriendlyAddress
                 });
                 console.log("Res: ", response2.data);
                 if(response2.data.ok) {
@@ -84,7 +90,7 @@ const CheckinComponent = () => {
                 } else {
                     const response = await axios.post(`${baseServerUrl}/giveaways/${giveawayId}/checkin`, {
                         captchaToken: recaptchaToken,
-                        receiverAddress: address,
+                        receiverAddress: userFriendlyAddress,
                         publicKey: publicKey,
                         signedProof: signedProof,
                     });
@@ -96,9 +102,8 @@ const CheckinComponent = () => {
                         console.log("Error: ", response.data.error);
                         setError('Failed to check in: ' + response.data.error);
                     }
+                    setRecaptchaToken(null);
                 }
-
-                
             } else {
                 setError("Please complete security check");
                 setTimeout(() => {
@@ -109,8 +114,9 @@ const CheckinComponent = () => {
 
 
         } catch (error) {
+            setRecaptchaToken(null);
             console.error('Check-in error:', error);
-            setError('Error checking in.');
+            setError('Checking in failed. Check number of participants allowed');
         }
     };
     const copyToClipboard = async(linkToCopy) => {
@@ -134,10 +140,8 @@ const CheckinComponent = () => {
 
     const handleGetStatus = async () => {
         try {
-
-            const address = tonConnectUI.account.address;
             const response2 = await axios.post(`${baseServerUrl}/participant/${giveawayId}`,{
-                receiverAddress: address
+                receiverAddress: userFriendlyAddress
             });
             console.log("Res: ", response2.data);
             if(response2.data.ok) {
@@ -155,6 +159,20 @@ const CheckinComponent = () => {
     return (
         <div className='App'>
             <CustomAlert message={error || success} severity={error ? 'error' : 'success'} />
+            <Box component="form" onSubmit={fetchGiveaway} sx={{ '& .MuiTextField-root': { m: 1, width: '25ch' } }}>
+                        <h2>GiveAway Checkin</h2>
+
+                        <TextField
+                            required
+                            id="giveawayId"
+                            variant="standard"
+                            type="text" name="giveawayId" value={giveawayId} onChange={(e) => setGiveawayId(e.target.value)} label="Giveaway ID"
+                        />
+                        
+                        <Button style={{ marginTop: '15px'}} type="submit" variant="contained" disabled={loading}>
+                            GET DETAILS
+                        </Button>
+                    </Box>
             <Card variant="outlined">
                         {giveaway ? (
                             <CardContent>
@@ -209,7 +227,7 @@ const CheckinComponent = () => {
             :
                 <>
                     {giveaway && giveaway.status == 'active' && <>
-                    {currentWallet && <div>Public Key: {currentWallet.account.publicKey}</div>}
+                    {userFriendlyAddress && <div>Address: {userFriendlyAddress}</div>}
 
                     <br />
                     <div style={{ margin: 'auto', width: '25%'}}>
